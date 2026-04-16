@@ -1,0 +1,8 @@
+{
+  "name": "Arogya Sahayak",
+  "description": "AI-Powered Multilingual Health Assistant for India",
+  "requestFramePermissions": [
+    "microphone"
+  ],
+  "majorCapabilities": []
+}

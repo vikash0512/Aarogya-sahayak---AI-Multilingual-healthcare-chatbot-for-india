@@ -1,0 +1,87 @@
+# =========================
+# OPERATING SYSTEM
+# =========================
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon
+._*
+.Spotlight-V100
+.Trashes
+__MACOSX/
+
+# =========================
+# IDE & EDITORS
+# =========================
+.idea/
+.vscode/
+*.swp
+*.swo
+*.swn
+.settings/
+
+# =========================
+# NODE / FRONTEND (React/Vite)
+# =========================
+node_modules/
+dist/
+dist-ssr/
+build/
+coverage/
+*.local
+.npm
+package-lock.json  # Note: Can remove this line if you want to enforce lockfile syncing, but usually ignored in early dev
+yarn.lock
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# =========================
+# PYTHON / BACKEND (Django)
+# =========================
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+backend/venv/
+venv/
+env/
+.env/
+pip-log.txt
+pip-delete-this-directory.txt
+
+# =========================
+# DJANGO SPECIFIC
+# =========================
+*.sqlite3
+db.sqlite3
+backend/db.sqlite3
+backend/media/
+backend/staticfiles/
+staticfiles/
+
+# =========================
+# VECTOR & KNOWLEDGE DATABASES
+# =========================
+chroma_db/
+backend/chroma_db/
+.chroma/
+*.parquet
+
+# =========================
+# ENVIRONMENT VARIABLES
+# =========================
+.env
+.env.*
+!.env.example
+backend/.env
+frontend/.env
+frontend/.env.local
+
+# =========================
+# LOGS & TEMP FILES
+# =========================
+*.log
+tmp/
+temp/
