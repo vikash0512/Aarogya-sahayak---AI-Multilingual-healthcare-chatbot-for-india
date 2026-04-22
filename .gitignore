@@ -80,6 +80,13 @@ frontend/.env
 frontend/.env.local
 
 # =========================
+# MARKDOWN DOCS
+# =========================
+*.md
+!README.md
+!**/README.md
+
+# =========================
 # LOGS & TEMP FILES
 # =========================
 *.log

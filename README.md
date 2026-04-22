@@ -1,94 +1,184 @@
-<div align="center">
-  
-# 🏥 Aarogya Sahayak
-### AI-Powered Multilingual Healthcare Chatbot for India
+# Aarogya Sahayak
 
-![React](https://img.shields.io/badge/React-20232A?style=for-the-badge&logo=react&logoColor=61DAFB)
-![Django](https://img.shields.io/badge/Django-092E20?style=for-the-badge&logo=django&logoColor=green)
-![TypeScript](https://img.shields.io/badge/TypeScript-007ACC?style=for-the-badge&logo=typescript&logoColor=white)
-![Supabase](https://img.shields.io/badge/Supabase-181818?style=for-the-badge&logo=supabase&logoColor=3ECF8E)
-![Google Maps API](https://img.shields.io/badge/Google%20Maps-4285F4?style=for-the-badge&logo=googlemaps&logoColor=white)
-![Twilio](https://img.shields.io/badge/Twilio-F22F46?style=for-the-badge&logo=twilio&logoColor=white)
+AI-powered multilingual healthcare assistant for India.
 
-*[Arogya Sahayak](https://github.com/vikash0512/Aarogya-sahayak---AI-Multilingual-healthcare-chatbot-for-india) is a highly accessible, production-grade diagnostic engine designed to bridge the healthcare divide in rural & urban India.*
-</div>
+This repository contains a React frontend and a Django backend for chat, medical knowledge ingestion, user management, profile settings, and production deployment on EC2 with Nginx, Gunicorn, and Supabase.
 
----
+## What this project does
 
-## 📖 The Vision
-In many parts of India, access to immediate, accurate primary healthcare information is severely limited by language barriers, internet bandwidth, and distance. **Arogya Sahayak** (Health Assistant) solves this by providing a hyper-localized, RAG-powered diagnostic AI that operates seamlessly across the Web and **WhatsApp**—meaning users can get lifesaving insights even on a 2G connection.
+- Answers healthcare questions with a retrieval-augmented generation workflow.
+- Supports admin ingestion of medical documents into vector search.
+- Shows nearby healthcare locations through Google Maps integration.
+- Uses Supabase for auth, storage, and database services.
+- Includes profile photo upload, dashboard messaging, and admin dashboards.
 
-This project was built to demonstrate full-stack engineering proficiency, AI pipeline construction over vector databases, and real-world system architecture designed for scalable public use.
+## Tech Stack
 
-## ✨ Core Features
+- Frontend: React, Vite, TypeScript, Tailwind CSS
+- Backend: Django, Django REST Framework
+- Database: Supabase PostgreSQL with pgvector
+- Auth and storage: Supabase
+- Deployment: EC2, Nginx, Gunicorn, systemd
 
-* 🧠 **RAG-Powered Diagnostic Engine**:
-  * Utilizes **pgvector (Supabase)** and **Sentence Transformers** to securely chunk, embed, and query massive custom medical datasets.
-  * Ensures that AI responses are strictly anchored in verified medical literature (Guardrails implemented to prevent AI hallucinations).
-* 📱 **WhatsApp Sandbox Integration**:
-  * Engineered a webhook listening architecture connecting the Twilio Sandbox / Meta Graph API directly to the Django backend. 
-  * Allows offline/low-bandwidth villagers to text symptoms and receive automated diagnostics in their native language—no app download required.
-* 🗺️ **Dynamic Nearby PHC Mapping**:
-  * Integrated **Google Maps & Places APIs** with HTML5 Geolocation to dynamically map out nearby Primary Health Centers (PHC), Clinics, and Hospitals in real-time based on a smart 8km radius.
-* 🛠️ **Administrative CMS Command Center**:
-  * Included a full internal Dashboard for non-technical operators to actively monitor Chat Sessions, update Google Maps API keys dynamically, re-index Vector Documents, and swap out LLM constraints on the fly without rewriting code.
+## Repository Layout
 
----
+- [backend/](backend)
+- [frontend/](frontend)
+- [aws.md](aws.md)
+- [DEPLOYMENT.md](DEPLOYMENT.md)
 
-## 🏗️ System Architecture
+## Requirements
 
-### Frontend (React + Vite + Tailwind CSS)
-- Fully responsive, dark-mode-enabled UI utilizing **Lucide React** for modern iconography.
-- Dynamic routing via `react-router-dom` prioritizing rapid client-side hydration.
-- Uses strict TypeScript rules to ensure enterprise-grade stability and zero unhandled type exceptions.
+- Node.js 20+
+- Python 3.10+
+- Supabase project with auth, storage, and PostgreSQL enabled
+- A Google Maps API key
+- Optional: Twilio account for WhatsApp integration
 
-### Backend (Django + Django REST Framework)
-- Stateful API management routing RAG processes safely behind `IsAuthenticated` endpoints.
-- Pluggable AI backend supporting Gemini/OpenAI interfaces contextually.
-- Configured connection limits via `dj_database_url` pooling to ensure concurrent scale-up without locking Postgres.
+## Environment Variables
 
-### Database Layer (Supabase Postgres)
-- Uses `pgvector` to run cosine similarity queries internally on the database.
-- Deep integration via `vector_store.py` transitioning from heavy local file-bloat directly into cloud-accessible matrices.
+Backend `.env`:
 
----
+```dotenv
+SECRET_KEY=your-secret
+DEBUG=True
+ALLOWED_HOSTS=localhost,127.0.0.1
 
-## 🚀 Quick Start / Development Guide
+SUPABASE_URL=https://your-project.supabase.co
+SUPABASE_ANON_KEY=your-anon-key
+SUPABASE_SERVICE_KEY=your-service-key
+SUPABASE_JWT_SECRET=your-jwt-secret
+SUPABASE_PROFILE_BUCKET=profile photo
 
-Want to run this project locally to explore the codebase? 
+DATABASE_URL=your-postgres-url
+GEMINI_API_KEY=your-gemini-key
+OPENAI_API_KEY=
+TWILIO_ACCOUNT_SID=
+TWILIO_AUTH_TOKEN=
+TWILIO_WHATSAPP_NUMBER=
+```
 
-### 1. Backend Setup
+Frontend `.env.local`:
+
+```dotenv
+VITE_API_BASE_URL=/api
+VITE_SUPABASE_URL=https://your-project.supabase.co
+VITE_SUPABASE_ANON_KEY=your-anon-key
+VITE_GOOGLE_MAPS_API_KEY=your-google-maps-key
+VITE_SUPABASE_PROFILE_BUCKET=profile photo
+```
+
+## Local Setup
+
+### Backend
+
 ```bash
 cd backend
 python -m venv venv
 source venv/bin/activate
 pip install -r requirements.txt
-
-# You MUST add a .env file locally containing your Supabase DATABASE_URL
 python manage.py migrate
 python manage.py runserver
 ```
 
-### 2. Frontend Setup
+### Frontend
+
 ```bash
 cd frontend
 npm install
-
-# Add your VITE_GOOGLE_MAPS_API_KEY inside frontend/.env.local
 npm run dev
 ```
-*Visit `http://localhost:3000` to interact with the platform natively!*
 
----
+Open the app at `http://localhost:3000`.
 
-## 📈 Future Road Map
-* **Multilingual Expansion**: Add native whisper.cpp integration for audio-based localized translation logic (Hindi, Tamil, Marathi, etc).
-* **Telehealth Bridge**: Direct push-notification or SMS relaying to an on-call physician if the AI diagnostic detects a high-severity guardrail match (`Emergency=True`).
-* **Prescription OCR**: Integrate Google Cloud Vision so patients can take photos of handwritten doctor prescriptions and have the AI translate dosage timings into local languages.
+## Common Commands
 
----
+### Backend
 
-<div align="center">
-  <b>Built with ❤️ by Vikash Kumar</b> <br>
-  <i>Open to Software Engineering & AI Architect Roles</i> 
-</div>
+```bash
+cd backend
+source venv/bin/activate
+python manage.py makemigrations
+python manage.py migrate
+python manage.py collectstatic --noinput
+python manage.py runserver
+python manage.py process_document_jobs
+```
+
+### Frontend
+
+```bash
+cd frontend
+npm install
+npm run dev
+npm run build
+```
+
+## How to Use the App
+
+### 1. Sign up and log in
+
+Create an account from the login or signup screens. The backend uses Supabase auth and syncs the user profile into Django.
+
+### 2. Ask medical questions
+
+Use the chat interface to ask health-related questions. The response is grounded in the ingested medical dataset.
+
+### 3. Upload profile photo
+
+Go to Settings, select an image, and upload it. The backend stores the file in the Supabase storage bucket configured in `SUPABASE_PROFILE_BUCKET`.
+
+### 4. Manage documents
+
+Admins can open the Knowledge Manager or Ingestion screen to upload documents, monitor progress, and re-index or delete records.
+
+### 5. Review users and settings
+
+Admins can manage users, LLM settings, Supabase settings, guardrails, and dashboard options from the admin panel.
+
+## Deployment Guide Summary
+
+The production setup runs on EC2 with:
+
+- Nginx serving the frontend and reverse proxying `/api`
+- Gunicorn serving Django
+- A background worker for document ingestion
+- Supabase for auth, storage, and vectors
+
+Key deployment commands:
+
+```bash
+cd /home/ubuntu/arogya-app
+git pull
+
+cd backend
+source venv/bin/activate
+pip install -r requirements.txt
+python manage.py migrate
+python manage.py collectstatic --noinput
+
+cd ../frontend
+npm install
+npm run build
+
+sudo systemctl restart arogya-gunicorn
+sudo systemctl restart arogya-ingestion-worker
+sudo systemctl restart nginx
+```
+
+## Troubleshooting
+
+- If profile upload fails, verify `SUPABASE_PROFILE_BUCKET` matches the exact bucket ID in Supabase.
+- If ingestion is stuck, restart `arogya-ingestion-worker` and check the document status in the admin panel.
+- If frontend changes do not appear, rebuild `frontend` and restart Nginx.
+- If auth loops happen, clear browser storage and sign in again.
+
+## Notes
+
+- Secrets should stay in `.env` files and never be committed.
+- `aws.md` contains the detailed EC2 runbook used during deployment.
+- `DEPLOYMENT.md` and `API_Setup_Guide.md` are legacy reference notes.
+
+## Deployment Ready
+
+This project is set up for deployment on EC2 with the current production flow already validated and pushed.
