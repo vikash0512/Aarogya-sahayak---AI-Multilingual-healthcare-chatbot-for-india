@@ -1,43 +1,89 @@
-# Aarogya Sahayak
+<div align="center">
 
-AI-powered multilingual healthcare assistant for India.
+# 🏥 Aarogya Sahayak
+### AI-Powered Multilingual Healthcare Assistant for India
 
-This repository contains a React frontend and a Django backend for chat, medical knowledge ingestion, user management, profile settings, and production deployment on EC2 with Nginx, Gunicorn, and Supabase.
+![React](https://img.shields.io/badge/React-20232A?style=for-the-badge&logo=react&logoColor=61DAFB)
+![TypeScript](https://img.shields.io/badge/TypeScript-007ACC?style=for-the-badge&logo=typescript&logoColor=white)
+![Django](https://img.shields.io/badge/Django-092E20?style=for-the-badge&logo=django&logoColor=white)
+![Supabase](https://img.shields.io/badge/Supabase-181818?style=for-the-badge&logo=supabase&logoColor=3ECF8E)
+![Vite](https://img.shields.io/badge/Vite-646CFF?style=for-the-badge&logo=vite&logoColor=white)
+![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-0F172A?style=for-the-badge&logo=tailwindcss&logoColor=38BDF8)
+![Gunicorn](https://img.shields.io/badge/Gunicorn-499848?style=for-the-badge&logo=gunicorn&logoColor=white)
+![Nginx](https://img.shields.io/badge/Nginx-009639?style=for-the-badge&logo=nginx&logoColor=white)
+![Google Maps](https://img.shields.io/badge/Google_Maps-4285F4?style=for-the-badge&logo=googlemaps&logoColor=white)
+![Twilio](https://img.shields.io/badge/Twilio-F22F46?style=for-the-badge&logo=twilio&logoColor=white)
 
-## What this project does
+An end-to-end healthcare platform built for accessible medical guidance, document-powered retrieval, admin operations, and EC2-ready deployment.
 
-- Answers healthcare questions with a retrieval-augmented generation workflow.
-- Supports admin ingestion of medical documents into vector search.
-- Shows nearby healthcare locations through Google Maps integration.
-- Uses Supabase for auth, storage, and database services.
-- Includes profile photo upload, dashboard messaging, and admin dashboards.
+</div>
 
-## Tech Stack
+---
 
-- Frontend: React, Vite, TypeScript, Tailwind CSS
-- Backend: Django, Django REST Framework
-- Database: Supabase PostgreSQL with pgvector
-- Auth and storage: Supabase
-- Deployment: EC2, Nginx, Gunicorn, systemd
+## Overview
 
-## Repository Layout
+Aarogya Sahayak combines a React + Vite frontend with a Django backend to deliver multilingual healthcare assistance across web and WhatsApp-friendly workflows. It uses Supabase for authentication, storage, and PostgreSQL, while pgvector powers document retrieval from trusted medical datasets.
+
+The project is designed to be practical, deployment-ready, and easy to operate for both technical and non-technical users.
+
+## What It Can Do
+
+- Answer healthcare questions through a retrieval-augmented generation flow.
+- Ingest medical documents and turn them into searchable vectors.
+- Show nearby healthcare locations with Google Maps integration.
+- Support patient settings, profile photos, and account management.
+- Provide an admin dashboard for documents, users, settings, and guardrails.
+- Run cleanly on EC2 behind Nginx and Gunicorn.
+
+## Technology Stack
+
+### Frontend
+
+- React
+- Vite
+- TypeScript
+- Tailwind CSS
+- Lucide React icons
+
+### Backend
+
+- Django
+- Django REST Framework
+- SimpleJWT
+- Supabase auth and service APIs
+
+### Data and Search
+
+- Supabase PostgreSQL
+- pgvector
+- ChromaDB fallback support for local development
+
+### Deployment
+
+- EC2
+- Nginx
+- Gunicorn
+- systemd services
+
+## Project Structure
 
 - [backend/](backend)
 - [frontend/](frontend)
 - [aws.md](aws.md)
 - [DEPLOYMENT.md](DEPLOYMENT.md)
+- [API_Setup_Guide.md](API_Setup_Guide.md)
 
 ## Requirements
 
 - Node.js 20+
 - Python 3.10+
 - Supabase project with auth, storage, and PostgreSQL enabled
-- A Google Maps API key
-- Optional: Twilio account for WhatsApp integration
+- Google Maps API key
+- Optional Twilio account for WhatsApp integration
 
-## Environment Variables
+## Environment Setup
 
-Backend `.env`:
+### Backend `.env`
 
 ```dotenv
 SECRET_KEY=your-secret
@@ -58,7 +104,7 @@ TWILIO_AUTH_TOKEN=
 TWILIO_WHATSAPP_NUMBER=
 ```
 
-Frontend `.env.local`:
+### Frontend `.env.local`
 
 ```dotenv
 VITE_API_BASE_URL=/api
@@ -68,7 +114,7 @@ VITE_GOOGLE_MAPS_API_KEY=your-google-maps-key
 VITE_SUPABASE_PROFILE_BUCKET=profile photo
 ```
 
-## Local Setup
+## Local Development
 
 ### Backend
 
@@ -91,7 +137,29 @@ npm run dev
 
 Open the app at `http://localhost:3000`.
 
-## Common Commands
+## How To Use The App
+
+### 1. Create an account
+
+Sign up from the login page. The backend syncs Supabase authentication into Django user profiles.
+
+### 2. Start a chat
+
+Ask a health-related question in the chat interface. Answers are grounded in the configured dataset and guardrails.
+
+### 3. Update your profile
+
+Go to Settings to edit your name, health details, and profile photo.
+
+### 4. Upload medical documents
+
+Admins can go to the ingestion page, upload a dataset, and monitor processing progress until the vectors are ready.
+
+### 5. Manage the system
+
+Admins can review users, update configuration, change guardrails, and inspect audit logs.
+
+## Useful Commands
 
 ### Backend
 
@@ -114,40 +182,20 @@ npm run dev
 npm run build
 ```
 
-## How to Use the App
+## Deployment Guide
 
-### 1. Sign up and log in
+The production stack runs on EC2 with:
 
-Create an account from the login or signup screens. The backend uses Supabase auth and syncs the user profile into Django.
+- Nginx serving the frontend and proxying `/api`
+- Gunicorn running Django
+- A background ingestion worker for document processing
+- Supabase for auth, storage, and database services
 
-### 2. Ask medical questions
-
-Use the chat interface to ask health-related questions. The response is grounded in the ingested medical dataset.
-
-### 3. Upload profile photo
-
-Go to Settings, select an image, and upload it. The backend stores the file in the Supabase storage bucket configured in `SUPABASE_PROFILE_BUCKET`.
-
-### 4. Manage documents
-
-Admins can open the Knowledge Manager or Ingestion screen to upload documents, monitor progress, and re-index or delete records.
-
-### 5. Review users and settings
-
-Admins can manage users, LLM settings, Supabase settings, guardrails, and dashboard options from the admin panel.
-
-## Deployment Guide Summary
-
-The production setup runs on EC2 with:
-
-- Nginx serving the frontend and reverse proxying `/api`
-- Gunicorn serving Django
-- A background worker for document ingestion
-- Supabase for auth, storage, and vectors
-
-Key deployment commands:
+### Routine Update Flow
 
 ```bash
+ssh -i "/Users/vikashkumar/Downloads/aarogya-sahayak.pem" ubuntu@ec2-3-1-201-179.ap-southeast-1.compute.amazonaws.com
+
 cd /home/ubuntu/arogya-app
 git pull
 
@@ -168,17 +216,17 @@ sudo systemctl restart nginx
 
 ## Troubleshooting
 
-- If profile upload fails, verify `SUPABASE_PROFILE_BUCKET` matches the exact bucket ID in Supabase.
-- If ingestion is stuck, restart `arogya-ingestion-worker` and check the document status in the admin panel.
-- If frontend changes do not appear, rebuild `frontend` and restart Nginx.
-- If auth loops happen, clear browser storage and sign in again.
+- If profile photo upload fails, confirm `SUPABASE_PROFILE_BUCKET` matches the exact bucket ID in Supabase.
+- If document processing appears stuck, restart `arogya-ingestion-worker` and check the admin ingestion page.
+- If frontend changes do not show up, rebuild the frontend and restart Nginx.
+- If auth behavior looks stale, clear browser storage and sign in again.
 
 ## Notes
 
-- Secrets should stay in `.env` files and never be committed.
-- `aws.md` contains the detailed EC2 runbook used during deployment.
-- `DEPLOYMENT.md` and `API_Setup_Guide.md` are legacy reference notes.
+- Do not commit secrets into the repository.
+- `aws.md` contains the detailed EC2 runbook.
+- `DEPLOYMENT.md` and `API_Setup_Guide.md` remain as reference guides.
 
-## Deployment Ready
-
-This project is set up for deployment on EC2 with the current production flow already validated and pushed.
+<div align="center">
+	<b>Made with ❤️ by Vikash Kumar</b>
+</div>
