@@ -3,9 +3,11 @@ Custom DRF authentication backend for Supabase JWT tokens.
 Validates Supabase access tokens and syncs users to Django's User model.
 """
 import jwt
+import hashlib
 import logging
 from django.conf import settings
 from django.contrib.auth.models import User
+from django.core.cache import cache
 from rest_framework import authentication, exceptions
 from core.models import UserProfile
 
@@ -35,6 +37,16 @@ class SupabaseAuthentication(authentication.BaseAuthentication):
         if not token:
             return None
 
+        cache_key = f"supabase_auth:{hashlib.sha256(token.encode('utf-8')).hexdigest()}"
+        cached_payload = cache.get(cache_key)
+        if cached_payload:
+            user = self._get_or_create_user(
+                cached_payload.get('sub'),
+                cached_payload.get('email', ''),
+                cached_payload,
+            )
+            return (user, cached_payload)
+
         # If Supabase is not configured structurally, skip this backend
         if not settings.SUPABASE_URL or not settings.SUPABASE_ANON_KEY:
             return None
@@ -54,6 +66,7 @@ class SupabaseAuthentication(authentication.BaseAuthentication):
                         'verify_aud': True,
                     }
                 )
+                cache.set(cache_key, payload, getattr(settings, 'SUPABASE_TOKEN_CACHE_TTL', 300))
             except jwt.ExpiredSignatureError:
                 raise exceptions.AuthenticationFailed('Token has expired')
             except jwt.InvalidTokenError as e:
@@ -74,6 +87,7 @@ class SupabaseAuthentication(authentication.BaseAuthentication):
                     'email': sb_user.email,
                     'user_metadata': sb_user.user_metadata or {}
                 }
+                cache.set(cache_key, payload, getattr(settings, 'SUPABASE_TOKEN_CACHE_TTL', 300))
             except Exception as e:
                 logger.error(f"Failed to verify token via Supabase API: {e}")
                 return None

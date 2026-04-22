@@ -168,46 +168,56 @@ export default function AdminLLMConfig() {
               <div className="space-y-2">
                 <label className="text-sm font-medium text-slate-700 dark:text-slate-300 flex items-center gap-2">
                   <Key className="w-4 h-4 text-slate-400" />
-                  API Key
+                  {provider === 'local' ? 'LM Studio Base URL / API Key (optional)' : 'API Key'}
                 </label>
                 <input 
-                  type="password" 
+                  type={provider === 'local' ? 'text' : 'password'}
                   value={apiKey}
                   onChange={(e) => setApiKey(e.target.value)}
-                  placeholder="Enter your API key..."
+                  placeholder={provider === 'local' ? 'http://localhost:1234/v1 (recommended)' : 'Enter your API key...'}
                   className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white focus:ring-2 focus:ring-primary/50 focus:border-primary outline-none font-mono text-sm"
                 />
-                <p className="text-xs text-slate-500 dark:text-slate-400">Your API key is encrypted and stored securely. Leave empty to keep existing key.</p>
+                {provider === 'local' ? (
+                  <p className="text-xs text-slate-500 dark:text-slate-400">
+                    For LM Studio, you can leave this empty (defaults to <span className="font-mono">http://localhost:1234/v1</span>). If you paste a URL here, the backend treats it as the local server base URL.
+                  </p>
+                ) : (
+                  <p className="text-xs text-slate-500 dark:text-slate-400">Your API key is encrypted and stored securely. Leave empty to keep existing key.</p>
+                )}
               </div>
 
               <div className="space-y-2">
                 <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Model Selection</label>
-                <select 
-                  value={modelName}
-                  onChange={(e) => setModelName(e.target.value)}
-                  className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white focus:ring-2 focus:ring-primary/50 focus:border-primary outline-none"
-                >
-                  {provider === 'gemini' && (
-                    <>
-                      <option value="gemini-2.5-flash">gemini-2.5-flash (Latest, Recommended)</option>
-                      <option value="gemini-2.5-pro">gemini-2.5-pro (Most Capable)</option>
-                      <option value="gemini-2.0-flash-lite">gemini-2.0-flash-lite (Fastest)</option>
-                    </>
-                  )}
-                  {provider === 'openai' && (
-                    <>
-                      <option value="gpt-4-turbo">gpt-4-turbo</option>
-                      <option value="gpt-4o">gpt-4o</option>
-                      <option value="gpt-3.5-turbo">gpt-3.5-turbo</option>
-                    </>
-                  )}
-                  {provider === 'local' && (
-                    <>
-                      <option value="llama-3-8b-instruct">llama-3-8b-instruct</option>
-                      <option value="mistral-7b-instruct">mistral-7b-instruct</option>
-                    </>
-                  )}
-                </select>
+                {provider === 'local' ? (
+                  <input
+                    type="text"
+                    value={modelName}
+                    onChange={(e) => setModelName(e.target.value)}
+                    placeholder="Enter your local model id (e.g., gemma-4...)"
+                    className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white focus:ring-2 focus:ring-primary/50 focus:border-primary outline-none font-mono text-sm"
+                  />
+                ) : (
+                  <select 
+                    value={modelName}
+                    onChange={(e) => setModelName(e.target.value)}
+                    className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white focus:ring-2 focus:ring-primary/50 focus:border-primary outline-none"
+                  >
+                    {provider === 'gemini' && (
+                      <>
+                        <option value="gemini-2.5-flash">gemini-2.5-flash (Latest, Recommended)</option>
+                        <option value="gemini-2.5-pro">gemini-2.5-pro (Most Capable)</option>
+                        <option value="gemini-2.0-flash-lite">gemini-2.0-flash-lite (Fastest)</option>
+                      </>
+                    )}
+                    {provider === 'openai' && (
+                      <>
+                        <option value="gpt-4-turbo">gpt-4-turbo</option>
+                        <option value="gpt-4o">gpt-4o</option>
+                        <option value="gpt-3.5-turbo">gpt-3.5-turbo</option>
+                      </>
+                    )}
+                  </select>
+                )}
               </div>
             </div>
           </div>

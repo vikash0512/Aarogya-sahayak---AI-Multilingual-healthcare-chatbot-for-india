@@ -197,19 +197,58 @@ def generate_response_gemini(prompt: str, api_key: str, model_name: str,
         return response.text
 
 
-def generate_response_openai(prompt: str, api_key: str, model_name: str,
-                              temperature: float = 0.7, max_tokens: int = 2048) -> str:
-    """Generate response using OpenAI API."""
+def generate_response_openai(
+    prompt: str,
+    api_key: str,
+    model_name: str,
+    temperature: float = 0.7,
+    max_tokens: int = 2048,
+    base_url: Optional[str] = None,
+) -> str:
+    """Generate response using OpenAI-compatible Chat Completions."""
     from openai import OpenAI
-    client = OpenAI(api_key=api_key)
-    response = client.chat.completions.create(
-        model=model_name,
-        messages=[{"role": "user", "content": prompt}],
+
+    client = OpenAI(api_key=api_key, base_url=base_url) if base_url else OpenAI(api_key=api_key)
+
+    # Some OpenAI-compatible servers may not support response_format.
+    try:
+        response = client.chat.completions.create(
+            model=model_name,
+            messages=[{"role": "user", "content": prompt}],
+            temperature=temperature,
+            max_tokens=max_tokens,
+            response_format={"type": "json_object"},
+        )
+    except Exception:
+        response = client.chat.completions.create(
+            model=model_name,
+            messages=[{"role": "user", "content": prompt}],
+            temperature=temperature,
+            max_tokens=max_tokens,
+        )
+
+    return response.choices[0].message.content
+
+
+def generate_response_local(
+    prompt: str,
+    model_name: str,
+    temperature: float = 0.7,
+    max_tokens: int = 2048,
+    base_url: Optional[str] = None,
+    api_key: str = "lm-studio",
+) -> str:
+    """Generate response using a local OpenAI-compatible server (LM Studio, Ollama+proxy, vLLM, etc.)."""
+    # LM Studio defaults to an OpenAI-compatible server at http://localhost:1234/v1
+    resolved_base_url = base_url or os.getenv('LOCAL_LLM_BASE_URL', '') or 'http://localhost:1234/v1'
+    return generate_response_openai(
+        prompt=prompt,
+        api_key=api_key or "lm-studio",
+        model_name=model_name,
         temperature=temperature,
         max_tokens=max_tokens,
-        response_format={"type": "json_object"},
+        base_url=resolved_base_url,
     )
-    return response.choices[0].message.content
 
 
 def parse_ai_response(raw_text: str) -> dict:
@@ -306,16 +345,20 @@ def get_ai_response(query: str, language: str = 'EN',
 
     # Step 5: Generate
     llm_config = LLMConfig.load()
-    api_key = llm_config.api_key or os.getenv('GEMINI_API_KEY', '') or os.getenv('OPENAI_API_KEY', '')
 
-    if not api_key:
+    # API key rules:
+    # - gemini/openai: key required
+    # - local: key not required (LM Studio accepts any placeholder)
+    api_key = llm_config.api_key or os.getenv('GEMINI_API_KEY', '') or os.getenv('OPENAI_API_KEY', '')
+    if llm_config.provider in ('gemini', 'openai') and not api_key:
+        provider_name = 'Gemini' if llm_config.provider == 'gemini' else 'OpenAI'
         return {
             'text': '',
             'structured': {
                 'message_type': 'assessment',
                 'greeting': 'Configuration Required',
                 'content': [
-                    {'type': 'warning', 'value': 'API key not set. Go to Admin → LLM Configuration to add your Gemini API key.'}
+                    {'type': 'warning', 'value': f'API key not set. Go to Admin → LLM Configuration to add your {provider_name} API key.'}
                 ],
                 'follow_up': None,
                 'sources_note': ''
@@ -328,6 +371,18 @@ def get_ai_response(query: str, language: str = 'EN',
             response_text = generate_response_openai(
                 prompt, api_key, llm_config.model_name,
                 llm_config.temperature, llm_config.max_tokens
+            )
+        elif llm_config.provider == 'local':
+            # If admin entered a URL in the API Key field, treat it as base_url.
+            base_url = api_key if isinstance(api_key, str) and api_key.startswith(('http://', 'https://')) else None
+            local_api_key = '' if base_url else api_key
+            response_text = generate_response_local(
+                prompt,
+                llm_config.model_name,
+                llm_config.temperature,
+                llm_config.max_tokens,
+                base_url=base_url,
+                api_key=local_api_key or 'lm-studio',
             )
         else:
             response_text = generate_response_gemini(

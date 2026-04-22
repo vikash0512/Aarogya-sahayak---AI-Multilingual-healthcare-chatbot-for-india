@@ -68,8 +68,9 @@ WSGI_APPLICATION = 'arogya.wsgi.application'
 DATABASE_URL = os.getenv('DATABASE_URL')
 
 if DATABASE_URL:
+    db_conn_max_age = int(os.getenv('DB_CONN_MAX_AGE', '120'))
     DATABASES = {
-        'default': dj_database_url.parse(DATABASE_URL, conn_max_age=0)
+        'default': dj_database_url.parse(DATABASE_URL, conn_max_age=db_conn_max_age, conn_health_checks=True)
     }
 else:
     DATABASES = {
@@ -110,6 +111,14 @@ CORS_ALLOWED_ORIGINS = [
 CORS_ALLOW_ALL_ORIGINS = DEBUG  # Only allow all in dev
 CORS_ALLOW_CREDENTIALS = True
 
+# CSRF trusted origins (needed for Twilio webhook through ngrok)
+CSRF_TRUSTED_ORIGINS = [
+    origin.strip() for origin in os.getenv(
+        'CSRF_TRUSTED_ORIGINS',
+        'http://localhost:3000,http://127.0.0.1:3000,https://*.ngrok-free.app,https://*.ngrok.io,https://*.ngrok-free.dev'
+    ).split(',') if origin.strip()
+]
+
 # REST Framework
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (
@@ -121,6 +130,18 @@ REST_FRAMEWORK = {
         'rest_framework.permissions.AllowAny',
     ),
 }
+
+# Cache (used for short-lived auth token verification cache and app-level caching)
+CACHES = {
+    'default': {
+        'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
+        'LOCATION': 'arogya-sahayak-cache',
+        'TIMEOUT': int(os.getenv('CACHE_TIMEOUT', '300')),
+    }
+}
+
+# Supabase auth cache (seconds)
+SUPABASE_TOKEN_CACHE_TTL = int(os.getenv('SUPABASE_TOKEN_CACHE_TTL', '300'))
 
 # JWT (kept as fallback for local dev without Supabase)
 SIMPLE_JWT = {

@@ -6,10 +6,25 @@
 import { supabase } from './supabaseClient';
 
 const API_BASE = '/api';
+
+let cachedAccessToken: string | null = null;
+let authListenerInitialized = false;
+
+async function ensureAuthListener() {
+  if (authListenerInitialized) return;
+  authListenerInitialized = true;
+
+  const { data: { session } } = await supabase.auth.getSession();
+  cachedAccessToken = session?.access_token ?? null;
+
+  supabase.auth.onAuthStateChange((_event, session) => {
+    cachedAccessToken = session?.access_token ?? null;
+  });
+}
+
 // Fetch wrapper with auth
 export async function apiFetch(path: string, options: RequestInit = {}): Promise<any> {
-  const { data: { session } } = await supabase.auth.getSession();
-  const access = session?.access_token;
+  await ensureAuthListener();
 
   const headers: Record<string, string> = {
     ...(options.headers as Record<string, string> || {}),
@@ -20,8 +35,8 @@ export async function apiFetch(path: string, options: RequestInit = {}): Promise
     headers['Content-Type'] = 'application/json';
   }
 
-  if (access) {
-    headers['Authorization'] = `Bearer ${access}`;
+  if (cachedAccessToken) {
+    headers['Authorization'] = `Bearer ${cachedAccessToken}`;
   }
 
   const response = await fetch(`${API_BASE}${path}`, {

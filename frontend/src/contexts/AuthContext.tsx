@@ -42,6 +42,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Listen for changes on auth state (logged in, signed out, etc.)
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (_event, session) => {
+        // We already hydrate initial state via getSession() above.
+        if (_event === 'INITIAL_SESSION') {
+          return;
+        }
+
         setSession(session);
         setUser(session?.user ?? null);
         if (session?.user) {
