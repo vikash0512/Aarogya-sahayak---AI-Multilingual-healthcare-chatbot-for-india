@@ -78,6 +78,7 @@ backend/chroma_db/
 backend/.env
 frontend/.env
 frontend/.env.local
+*.pem
 
 # =========================
 # MARKDOWN DOCS
