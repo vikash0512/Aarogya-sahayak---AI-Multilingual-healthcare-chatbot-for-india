@@ -26,6 +26,17 @@ Aarogya Sahayak combines a React + Vite frontend with a Django backend to delive
 
 The project is designed to be practical, deployment-ready, and easy to operate for both technical and non-technical users.
 
+> A production-minded healthcare assistant with a clean admin workflow, polished patient settings, and an EC2 deployment path that is ready to use.
+
+## At a Glance
+
+| Area | What it does |
+| --- | --- |
+| Frontend | Beautiful patient and admin interfaces built with React, Vite, TypeScript, and Tailwind CSS |
+| Backend | Django APIs for chat, auth, documents, ingestion, and user profiles |
+| Storage | Supabase auth, storage, and PostgreSQL with pgvector support |
+| Deployment | Nginx, Gunicorn, systemd, and EC2 |
+
 ## What It Can Do
 
 - Answer healthcare questions through a retrieval-augmented generation flow.
@@ -86,32 +97,32 @@ The project is designed to be practical, deployment-ready, and easy to operate f
 ### Backend `.env`
 
 ```dotenv
-SECRET_KEY=your-secret
-DEBUG=True
-ALLOWED_HOSTS=localhost,127.0.0.1
+$ SECRET_KEY=your-secret
+$ DEBUG=True
+$ ALLOWED_HOSTS=localhost,127.0.0.1
 
-SUPABASE_URL=https://your-project.supabase.co
-SUPABASE_ANON_KEY=your-anon-key
-SUPABASE_SERVICE_KEY=your-service-key
-SUPABASE_JWT_SECRET=your-jwt-secret
-SUPABASE_PROFILE_BUCKET=profile photo
+$ SUPABASE_URL=https://your-project.supabase.co
+$ SUPABASE_ANON_KEY=your-anon-key
+$ SUPABASE_SERVICE_KEY=your-service-key
+$ SUPABASE_JWT_SECRET=your-jwt-secret
+$ SUPABASE_PROFILE_BUCKET=profile photo
 
-DATABASE_URL=your-postgres-url
-GEMINI_API_KEY=your-gemini-key
-OPENAI_API_KEY=
-TWILIO_ACCOUNT_SID=
-TWILIO_AUTH_TOKEN=
-TWILIO_WHATSAPP_NUMBER=
+$ DATABASE_URL=your-postgres-url
+$ GEMINI_API_KEY=your-gemini-key
+$ OPENAI_API_KEY=
+$ TWILIO_ACCOUNT_SID=
+$ TWILIO_AUTH_TOKEN=
+$ TWILIO_WHATSAPP_NUMBER=
 ```
 
 ### Frontend `.env.local`
 
 ```dotenv
-VITE_API_BASE_URL=/api
-VITE_SUPABASE_URL=https://your-project.supabase.co
-VITE_SUPABASE_ANON_KEY=your-anon-key
-VITE_GOOGLE_MAPS_API_KEY=your-google-maps-key
-VITE_SUPABASE_PROFILE_BUCKET=profile photo
+$ VITE_API_BASE_URL=/api
+$ VITE_SUPABASE_URL=https://your-project.supabase.co
+$ VITE_SUPABASE_ANON_KEY=your-anon-key
+$ VITE_GOOGLE_MAPS_API_KEY=your-google-maps-key
+$ VITE_SUPABASE_PROFILE_BUCKET=profile photo
 ```
 
 ## Local Development
@@ -119,20 +130,20 @@ VITE_SUPABASE_PROFILE_BUCKET=profile photo
 ### Backend
 
 ```bash
-cd backend
-python -m venv venv
-source venv/bin/activate
-pip install -r requirements.txt
-python manage.py migrate
-python manage.py runserver
+$ cd backend
+$ python -m venv venv
+$ source venv/bin/activate
+$ pip install -r requirements.txt
+$ python manage.py migrate
+$ python manage.py runserver
 ```
 
 ### Frontend
 
 ```bash
-cd frontend
-npm install
-npm run dev
+$ cd frontend
+$ npm install
+$ npm run dev
 ```
 
 Open the app at `http://localhost:3000`.
@@ -164,22 +175,22 @@ Admins can review users, update configuration, change guardrails, and inspect au
 ### Backend
 
 ```bash
-cd backend
-source venv/bin/activate
-python manage.py makemigrations
-python manage.py migrate
-python manage.py collectstatic --noinput
-python manage.py runserver
-python manage.py process_document_jobs
+$ cd backend
+$ source venv/bin/activate
+$ python manage.py makemigrations
+$ python manage.py migrate
+$ python manage.py collectstatic --noinput
+$ python manage.py runserver
+$ python manage.py process_document_jobs
 ```
 
 ### Frontend
 
 ```bash
-cd frontend
-npm install
-npm run dev
-npm run build
+$ cd frontend
+$ npm install
+$ npm run dev
+$ npm run build
 ```
 
 ## Deployment Guide
@@ -194,24 +205,20 @@ The production stack runs on EC2 with:
 ### Routine Update Flow
 
 ```bash
-ssh -i "/Users/vikashkumar/Downloads/aarogya-sahayak.pem" ubuntu@ec2-3-1-201-179.ap-southeast-1.compute.amazonaws.com
-
-cd /home/ubuntu/arogya-app
-git pull
-
-cd backend
-source venv/bin/activate
-pip install -r requirements.txt
-python manage.py migrate
-python manage.py collectstatic --noinput
-
-cd ../frontend
-npm install
-npm run build
-
-sudo systemctl restart arogya-gunicorn
-sudo systemctl restart arogya-ingestion-worker
-sudo systemctl restart nginx
+$ ssh -i "/Users/vikashkumar/Downloads/aarogya-sahayak.pem" ubuntu@ec2-3-1-201-179.ap-southeast-1.compute.amazonaws.com
+$ cd /home/ubuntu/arogya-app
+$ git pull
+$ cd backend
+$ source venv/bin/activate
+$ pip install -r requirements.txt
+$ python manage.py migrate
+$ python manage.py collectstatic --noinput
+$ cd ../frontend
+$ npm install
+$ npm run build
+$ sudo systemctl restart arogya-gunicorn
+$ sudo systemctl restart arogya-ingestion-worker
+$ sudo systemctl restart nginx
 ```
 
 ## Troubleshooting
