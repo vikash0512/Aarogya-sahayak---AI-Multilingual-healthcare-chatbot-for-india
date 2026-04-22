@@ -4,6 +4,7 @@ from django.conf import settings
 
 class Document(models.Model):
     STATUS_CHOICES = [
+        ('queued', 'Queued'),
         ('uploaded', 'Uploaded'),
         ('processing', 'Processing'),
         ('indexed', 'Indexed'),
@@ -48,3 +49,27 @@ class DocumentChunk(models.Model):
 
     def __str__(self):
         return f"Chunk {self.chunk_index} of {self.document.name}"
+
+
+class DocumentIngestionJob(models.Model):
+    STATUS_CHOICES = [
+        ('queued', 'Queued'),
+        ('processing', 'Processing'),
+        ('completed', 'Completed'),
+        ('failed', 'Failed'),
+    ]
+
+    document = models.OneToOneField(Document, on_delete=models.CASCADE, related_name='ingestion_job')
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='queued')
+    attempts = models.IntegerField(default=0)
+    error_message = models.TextField(blank=True, default='')
+    started_at = models.DateTimeField(null=True, blank=True)
+    finished_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"{self.document.name} ({self.status})"

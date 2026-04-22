@@ -40,18 +40,22 @@ class ChromaStore:
         except Exception as e:
             logger.warning(f"ChromaStore delete error: {e}")
 
-    def add_chunks(self, document, chunks: list, embeddings: list):
+    def add_chunks(self, document, chunks: list, embeddings: list, start_index: int = 0):
+        self.add_chunks_batch(document, chunks, embeddings, start_index=start_index)
+
+    def add_chunks_batch(self, document, chunks: list, embeddings: list, start_index: int = 0):
         ids = []
         metadatas = []
         documents_text = []
 
         for i, (chunk_text, _) in enumerate(zip(chunks, embeddings)):
-            vector_id = f"doc_{document.id}_chunk_{i}_{uuid.uuid4().hex[:8]}"
+            chunk_index = start_index + i
+            vector_id = f"doc_{document.id}_chunk_{chunk_index}_{uuid.uuid4().hex[:8]}"
             ids.append(vector_id)
             metadatas.append({
                 "document_id": str(document.id),
                 "document_name": document.name,
-                "chunk_index": i,
+                "chunk_index": chunk_index,
                 "source_authority": document.source_authority,
             })
             documents_text.append(chunk_text)
@@ -59,7 +63,7 @@ class ChromaStore:
             DocumentChunk.objects.create(
                 document=document,
                 content=chunk_text,
-                chunk_index=i,
+                chunk_index=chunk_index,
                 token_count=len(chunk_text.split()),
                 vector_id=vector_id,
                 metadata={"source": document.name, "authority": document.source_authority}
@@ -146,12 +150,16 @@ class PgVectorStore:
         with self.connection.cursor() as cursor:
             cursor.execute("DELETE FROM knowledge_vector_store WHERE document_id = %s;", [document_id])
 
-    def add_chunks(self, document, chunks: list, embeddings: list, user_id: int = None):
+    def add_chunks(self, document, chunks: list, embeddings: list, user_id: int = None, start_index: int = 0):
+        self.add_chunks_batch(document, chunks, embeddings, user_id=user_id, start_index=start_index)
+
+    def add_chunks_batch(self, document, chunks: list, embeddings: list, user_id: int = None, start_index: int = 0):
         if self.connection.vendor != 'postgresql':
             raise Exception("Cannot add chunks to pgvector: DB is not PostgreSQL.")
             
         with self.connection.cursor() as cursor:
             for i, (chunk_text, embedding) in enumerate(zip(chunks, embeddings)):
+                chunk_index = start_index + i
                 # Ensure embedding is a valid string representation of vector
                 embedding_str = f"[{','.join(map(str, embedding))}]"
                 
@@ -159,14 +167,14 @@ class PgVectorStore:
                     INSERT INTO knowledge_vector_store
                     (document_id, document_name, chunk_index, source_authority, content, embedding, user_id)
                     VALUES (%s, %s, %s, %s, %s, %s, %s);
-                """, [document.id, document.name, i, document.source_authority, chunk_text, embedding_str, user_id])
+                """, [document.id, document.name, chunk_index, document.source_authority, chunk_text, embedding_str, user_id])
                 
                 DocumentChunk.objects.create(
                     document=document,
                     content=chunk_text,
-                    chunk_index=i,
+                    chunk_index=chunk_index,
                     token_count=len(chunk_text.split()),
-                    vector_id=f"pg_{document.id}_{i}",
+                    vector_id=f"pg_{document.id}_{chunk_index}",
                     metadata={"source": document.name, "authority": document.source_authority, "user_id": user_id}
                 )
 

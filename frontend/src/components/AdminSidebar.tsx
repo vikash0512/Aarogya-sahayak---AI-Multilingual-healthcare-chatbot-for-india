@@ -1,10 +1,12 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { 
   BriefcaseMedical, LayoutDashboard, Users, BookOpen, UploadCloud, 
   Box, BrainCircuit, ShieldCheck, History, LogOut, X, Settings, Database, Smartphone
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
+import { getUserProfile } from '../api';
+import { getProfilePhotoUrlFromExtra } from '../utils/profilePhoto';
 
 interface AdminSidebarProps {
   isOpen: boolean;
@@ -15,6 +17,30 @@ export default function AdminSidebar({ isOpen, setIsOpen }: AdminSidebarProps) {
   const location = useLocation();
   const path = location.pathname;
   const { user, signOut } = useAuth();
+  const [profilePhotoUrl, setProfilePhotoUrl] = useState('');
+
+  useEffect(() => {
+    let mounted = true;
+    const load = async () => {
+      try {
+        const profile = await getUserProfile();
+        if (!mounted) return;
+        setProfilePhotoUrl(getProfilePhotoUrlFromExtra(profile.extra_data));
+      } catch {
+        if (mounted) setProfilePhotoUrl('');
+      }
+    };
+
+    if (user) {
+      load();
+    } else {
+      setProfilePhotoUrl('');
+    }
+
+    return () => {
+      mounted = false;
+    };
+  }, [user?.id]);
 
   const platformLinks = [
     { name: 'Overview', path: '/admin', icon: LayoutDashboard },
@@ -127,7 +153,11 @@ export default function AdminSidebar({ isOpen, setIsOpen }: AdminSidebarProps) {
           
           <div className="flex items-center gap-3 px-3 py-2 rounded-lg bg-slate-50 dark:bg-slate-800/50">
             <div className="h-9 w-9 rounded-full bg-primary/20 text-primary flex items-center justify-center font-bold overflow-hidden shrink-0">
-              {user?.user_metadata?.full_name?.charAt(0) || user?.email?.charAt(0) || 'A'}
+              {profilePhotoUrl ? (
+                <img src={profilePhotoUrl} alt="Profile" className="w-full h-full object-cover rounded-full" loading="lazy" />
+              ) : (
+                <>{user?.user_metadata?.full_name?.charAt(0) || user?.email?.charAt(0) || 'A'}</>
+              )}
             </div>
             <div className="flex flex-col flex-1 overflow-hidden min-w-0">
               <p className="text-sm font-medium truncate text-slate-900 dark:text-white">

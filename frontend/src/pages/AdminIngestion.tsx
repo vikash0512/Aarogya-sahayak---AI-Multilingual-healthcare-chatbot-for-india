@@ -5,7 +5,7 @@ import {
   Menu, HelpCircle, Bell, UploadCloud, Sliders, 
   Bot, Activity, FileText, CheckCircle2, ChevronRight, Loader2, AlertCircle
 } from 'lucide-react';
-import { uploadDocument, processDocument, getDocumentStatus, getDocuments } from '../api';
+import { uploadDocument, getDocumentStatus, getDocuments } from '../api';
 
 export default function AdminIngestion() {
   const { toggleSidebar } = useOutletContext<AdminLayoutContextType>();
@@ -18,11 +18,52 @@ export default function AdminIngestion() {
   const [completedDocs, setCompletedDocs] = useState<any[]>([]);
   const [error, setError] = useState('');
   const [statusMessage, setStatusMessage] = useState('');
+  const [processProgress, setProcessProgress] = useState(0);
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
+  const [estimatedTotalSeconds, setEstimatedTotalSeconds] = useState(90);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const pollRef = useRef<number | null>(null);
+  const timerRef = useRef<number | null>(null);
+  const progressRef = useRef(0);
+  const elapsedRef = useRef(0);
 
   useEffect(() => {
     loadCompletedDocs();
+    return () => {
+      if (pollRef.current) {
+        window.clearInterval(pollRef.current);
+      }
+      if (timerRef.current) {
+        window.clearInterval(timerRef.current);
+      }
+    };
   }, []);
+
+  useEffect(() => {
+    progressRef.current = processProgress;
+  }, [processProgress]);
+
+  useEffect(() => {
+    elapsedRef.current = elapsedSeconds;
+  }, [elapsedSeconds]);
+
+  const formatSeconds = (value: number) => {
+    const total = Math.max(0, Math.floor(value));
+    const mins = Math.floor(total / 60);
+    const secs = total % 60;
+    if (mins === 0) return `${secs}s`;
+    return `${mins}m ${secs}s`;
+  };
+
+  const estimateProgressFromStatus = (statusValue: string) => {
+    const s = (statusValue || '').toLowerCase();
+    if (s === 'queued' || s === 'pending') return 15;
+    if (s === 'processing') return 55;
+    if (s === 'indexing') return 85;
+    if (s === 'indexed' || s === 'completed' || s === 'success') return 100;
+    if (s === 'failed') return processProgress;
+    return Math.max(20, processProgress);
+  };
 
   const loadCompletedDocs = async () => {
     try {
@@ -38,34 +79,83 @@ export default function AdminIngestion() {
     setUploading(true);
     setError('');
     setStatusMessage('Uploading file...');
+    setProcessProgress(5);
+    setElapsedSeconds(0);
+    setEstimatedTotalSeconds(90);
+
+    if (pollRef.current) {
+      window.clearInterval(pollRef.current);
+      pollRef.current = null;
+    }
+    if (timerRef.current) {
+      window.clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
 
     try {
       const result = await uploadDocument(file, chunkSize, sourceLanguage, sourceAuthority);
-      setCurrentDoc({ id: result.id, name: file.name, status: 'uploaded' });
-      setStatusMessage('File uploaded. Starting processing...');
+      setCurrentDoc({ id: result.id, jobId: result.job_id, name: file.name, status: result.status || 'queued' });
+      setStatusMessage('File uploaded. Processing queued on the server...');
+      setProcessProgress(Math.max(15, estimateProgressFromStatus(result.status || 'queued')));
 
-      // Auto-start processing
       setProcessing(true);
-      await processDocument(result.id);
-      setStatusMessage('Processing started. Chunking and embedding...');
+      timerRef.current = window.setInterval(() => {
+        setElapsedSeconds((prev) => prev + 1);
+      }, 1000);
 
-      // Poll for status
-      const pollStatus = setInterval(async () => {
+      pollRef.current = window.setInterval(async () => {
         try {
           const status = await getDocumentStatus(result.id);
           setCurrentDoc(status);
+
+          const statusProgress = estimateProgressFromStatus(status.status);
+          setProcessProgress((prev) => {
+            if (statusProgress >= 100) return 100;
+            return Math.max(prev, statusProgress);
+          });
+
           if (status.status === 'indexed') {
-            clearInterval(pollStatus);
+            if (pollRef.current) {
+              window.clearInterval(pollRef.current);
+              pollRef.current = null;
+            }
+            if (timerRef.current) {
+              window.clearInterval(timerRef.current);
+              timerRef.current = null;
+            }
             setProcessing(false);
+            setProcessProgress(100);
             setStatusMessage(`✅ Successfully processed! ${status.chunks} chunks created.`);
             loadCompletedDocs();
           } else if (status.status === 'failed') {
-            clearInterval(pollStatus);
+            if (pollRef.current) {
+              window.clearInterval(pollRef.current);
+              pollRef.current = null;
+            }
+            if (timerRef.current) {
+              window.clearInterval(timerRef.current);
+              timerRef.current = null;
+            }
             setProcessing(false);
             setError(`Processing failed: ${status.error}`);
+          } else {
+            setStatusMessage(`Processing on server: ${status.status}...`);
+
+            const safeProgress = Math.max(1, progressRef.current);
+            const derivedEstimate = Math.ceil((elapsedRef.current * 100) / safeProgress);
+            const boundedEstimate = Math.min(600, Math.max(30, derivedEstimate));
+            setEstimatedTotalSeconds((prev) => Math.max(prev, boundedEstimate));
           }
         } catch (err) {
-          clearInterval(pollStatus);
+          if (pollRef.current) {
+            window.clearInterval(pollRef.current);
+            pollRef.current = null;
+          }
+          if (timerRef.current) {
+            window.clearInterval(timerRef.current);
+            timerRef.current = null;
+          }
+          setProcessing(false);
         }
       }, 2000);
     } catch (err: any) {
@@ -182,6 +272,12 @@ export default function AdminIngestion() {
               <div className="p-4 bg-primary/5 border border-primary/20 rounded-lg text-sm text-primary font-medium">
                 {processing && <Loader2 className="w-4 h-4 animate-spin inline mr-2" />}
                 {statusMessage}
+                {processing && (
+                  <div className="mt-2 text-xs text-slate-600 dark:text-slate-300">
+                    Progress: {processProgress}% • Elapsed: {formatSeconds(elapsedSeconds)} • Est. wait left:{' '}
+                    {formatSeconds(Math.max(0, estimatedTotalSeconds - elapsedSeconds))}
+                  </div>
+                )}
               </div>
             )}
 
@@ -198,8 +294,15 @@ export default function AdminIngestion() {
                 </div>
                 {processing && (
                   <div className="space-y-1.5">
+                    <div className="flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400">
+                      <span>{processProgress}%</span>
+                      <span>ETA {formatSeconds(Math.max(0, estimatedTotalSeconds - elapsedSeconds))}</span>
+                    </div>
                     <div className="h-2 w-full bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
-                      <div className="h-full bg-primary w-full rounded-full animate-pulse"></div>
+                      <div
+                        className="h-full bg-primary rounded-full transition-all duration-700 ease-out"
+                        style={{ width: `${Math.max(8, processProgress)}%` }}
+                      ></div>
                     </div>
                   </div>
                 )}

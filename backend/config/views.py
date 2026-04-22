@@ -12,12 +12,17 @@ from .serializers import (
 from audit.utils import log_action
 
 logger = logging.getLogger(__name__)
+ADMIN_EMAILS = {'admin@arogyasahayak.in'}
 
 
 def _is_admin(request):
     """Check if the request user has admin role."""
     if not request.user or not request.user.is_authenticated:
         return False
+    if request.user.is_staff or request.user.is_superuser:
+        return True
+    if (request.user.email or '').lower() in ADMIN_EMAILS:
+        return True
     profile = getattr(request.user, 'profile', None)
     return profile and profile.role == 'admin'
 
@@ -153,7 +158,7 @@ def test_supabase_connection(request):
             from supabase import create_client
             client = create_client(config.project_url, config.service_key)
             # Simple health check
-            client.auth.admin.list_users(per_page=1, page=1)
+            client.auth.admin.list_users(page=1, per_page=1)
             results['auth'] = True
         except Exception as e:
             results['auth_error'] = str(e)

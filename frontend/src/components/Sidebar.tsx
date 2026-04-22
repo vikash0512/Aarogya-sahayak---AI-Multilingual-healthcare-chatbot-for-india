@@ -1,9 +1,11 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import {
   BriefcaseMedical, Home, MessageSquare, BookOpen, MapPin, History, Settings, X, LogOut
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
+import { getUserProfile } from '../api';
+import { getProfilePhotoUrlFromExtra } from '../utils/profilePhoto';
 
 interface SidebarProps {
   isOpen: boolean;
@@ -14,6 +16,30 @@ export default function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
   const location = useLocation();
   const path = location.pathname;
   const { user, signOut } = useAuth();
+  const [profilePhotoUrl, setProfilePhotoUrl] = useState('');
+
+  useEffect(() => {
+    let mounted = true;
+    const load = async () => {
+      try {
+        const profile = await getUserProfile();
+        if (!mounted) return;
+        setProfilePhotoUrl(getProfilePhotoUrlFromExtra(profile.extra_data));
+      } catch {
+        if (mounted) setProfilePhotoUrl('');
+      }
+    };
+
+    if (user) {
+      load();
+    } else {
+      setProfilePhotoUrl('');
+    }
+
+    return () => {
+      mounted = false;
+    };
+  }, [user?.id]);
 
   const navLinks = [
     { name: 'Home', path: '/dashboard', icon: Home },
@@ -98,7 +124,11 @@ export default function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
             <div className="flex items-center justify-between p-4 border-t border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/50 w-full rounded-xl">
               <div className="flex items-center gap-3 overflow-hidden">
                 <div className="h-10 w-10 rounded-full bg-primary/20 text-primary flex items-center justify-center font-bold text-lg shrink-0">
-                  {user?.email?.charAt(0).toUpperCase() || 'U'}
+                  {profilePhotoUrl ? (
+                    <img src={profilePhotoUrl} alt="Profile" className="w-full h-full object-cover rounded-full" loading="lazy" />
+                  ) : (
+                    <>{user?.email?.charAt(0).toUpperCase() || 'U'}</>
+                  )}
                 </div>
                 <div className="min-w-0 flex-1">
                   <p className="text-sm font-semibold text-slate-900 dark:text-white truncate">

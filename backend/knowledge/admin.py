@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Document, DocumentChunk
+from .models import Document, DocumentChunk, DocumentIngestionJob
 
 @admin.register(Document)
 class DocumentAdmin(admin.ModelAdmin):
@@ -10,3 +10,9 @@ class DocumentAdmin(admin.ModelAdmin):
 class DocumentChunkAdmin(admin.ModelAdmin):
     list_display = ['document', 'chunk_index', 'token_count']
     list_filter = ['document']
+
+
+@admin.register(DocumentIngestionJob)
+class DocumentIngestionJobAdmin(admin.ModelAdmin):
+    list_display = ['document', 'status', 'attempts', 'created_at', 'updated_at']
+    list_filter = ['status']

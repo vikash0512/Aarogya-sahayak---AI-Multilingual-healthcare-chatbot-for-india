@@ -8,4 +8,5 @@ urlpatterns = [
     path('documents/<int:doc_id>/delete/', views.delete_document, name='document-delete'),
     path('documents/<int:doc_id>/reindex/', views.reindex_document, name='document-reindex'),
     path('documents/<int:doc_id>/status/', views.document_status, name='document-status'),
+    path('ingestion-jobs/<int:job_id>/status/', views.ingestion_job_status, name='ingestion-job-status'),
 ]

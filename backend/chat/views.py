@@ -60,7 +60,34 @@ def chat_view(request):
 
     # Get AI response via RAG pipeline (with full history)
     user_id = request.user.id if request.user.is_authenticated else None
-    result = get_ai_response(message, language, history, user_id=user_id)
+    try:
+        result = get_ai_response(message, language, history, user_id=user_id)
+    except Exception as exc:
+        logger_message = str(exc)[:500]
+        log_action(
+            user=request.user if request.user.is_authenticated else None,
+            action='Chat Query Failed',
+            resource=f'Session {session.id}',
+            ip=request.META.get('REMOTE_ADDR', ''),
+            status_val='Failed',
+            details={'error': logger_message},
+        )
+        result = {
+            'text': 'I could not process that request right now. Please try again in a moment.',
+            'structured': {
+                'message_type': 'general_info',
+                'greeting': 'I am having trouble reaching the medical engine right now.',
+                'content': [
+                    {'type': 'warning', 'value': 'Please try again in a moment. If the issue continues, check the AI and database settings in Admin.'}
+                ],
+                'follow_up': None,
+                'sources_note': '',
+            },
+            'verified': False,
+            'warning': logger_message,
+            'sources': [],
+            'confidence': 0,
+        }
 
     # Save AI message
     ai_msg = ChatMessage.objects.create(

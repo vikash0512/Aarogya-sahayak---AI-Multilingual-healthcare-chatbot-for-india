@@ -155,14 +155,17 @@ SUPABASE_URL = os.getenv('SUPABASE_URL', '')
 SUPABASE_ANON_KEY = os.getenv('SUPABASE_ANON_KEY', '')
 SUPABASE_SERVICE_KEY = os.getenv('SUPABASE_SERVICE_KEY', '')
 SUPABASE_JWT_SECRET = os.getenv('SUPABASE_JWT_SECRET', '')
+SUPABASE_PROFILE_BUCKET = os.getenv('SUPABASE_PROFILE_BUCKET', 'profile-photo')
 
 # ChromaDB (legacy, kept for backward compat if pgvector not available)
 CHROMA_PERSIST_DIR = str(BASE_DIR / 'chroma_db')
 CHROMA_COLLECTION_NAME = 'arogya_medical'
 
 # File uploads
-FILE_UPLOAD_MAX_MEMORY_SIZE = 26214400  # 25MB
-DATA_UPLOAD_MAX_MEMORY_SIZE = 26214400
+# Keep the in-memory threshold below large dataset sizes so Django streams uploads to temp files.
+MAX_UPLOAD_SIZE = int(os.getenv('MAX_UPLOAD_SIZE', str(250 * 1024 * 1024)))  # 250MB default
+FILE_UPLOAD_MAX_MEMORY_SIZE = int(os.getenv('FILE_UPLOAD_MAX_MEMORY_SIZE', str(10 * 1024 * 1024)))
+DATA_UPLOAD_MAX_MEMORY_SIZE = int(os.getenv('DATA_UPLOAD_MAX_MEMORY_SIZE', str(MAX_UPLOAD_SIZE)))
 
 # Security (production)
 if not DEBUG:
@@ -174,4 +177,5 @@ if not DEBUG:
     SECURE_HSTS_SECONDS = 31536000
     SECURE_HSTS_INCLUDE_SUBDOMAINS = True
     SECURE_HSTS_PRELOAD = True
-    SECURE_SSL_REDIRECT = os.getenv('SECURE_SSL_REDIRECT', 'True').lower() == 'true'
+    # Keep HTTPS redirect opt-in so fresh HTTP-only servers do not break API/auth until SSL is configured.
+    SECURE_SSL_REDIRECT = os.getenv('SECURE_SSL_REDIRECT', 'False').lower() == 'true'

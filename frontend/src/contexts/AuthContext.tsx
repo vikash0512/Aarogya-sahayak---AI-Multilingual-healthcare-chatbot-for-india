@@ -33,7 +33,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setSession(session);
       setUser(session?.user ?? null);
       if (session?.user) {
-        fetchRole();
+        fetchRole(session.user);
       } else {
         setLoading(false);
       }
@@ -50,7 +50,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setSession(session);
         setUser(session?.user ?? null);
         if (session?.user) {
-          fetchRole();
+          fetchRole(session.user);
         } else {
           setRole(null);
           setLoading(false);
@@ -61,18 +61,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => subscription.unsubscribe();
   }, []);
 
-  const fetchRole = async () => {
+  const fetchRole = async (sessionUser?: User | null) => {
     try {
       const data = await apiFetch('/auth/me/');
       if (data && data.role) {
         setRole(data.role);
       } else {
-        setRole('patient'); // Default fallback
+        const metaRole =
+          (sessionUser as any)?.app_metadata?.role ||
+          (sessionUser as any)?.user_metadata?.role ||
+          null;
+        setRole(metaRole);
       }
     } catch (error) {
       console.error('Error fetching user role:', error);
-      // Only set generic fallback if role isn't already known, to prevent accidental kicks
-      setRole((currentRole) => currentRole || 'patient');
+      // Keep known role if available; avoid defaulting to patient on transient API/network errors.
+      setRole((currentRole) => currentRole ?? null);
     } finally {
       setLoading(false);
     }

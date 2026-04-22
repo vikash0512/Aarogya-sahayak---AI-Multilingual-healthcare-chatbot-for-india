@@ -7,4 +7,5 @@ urlpatterns = [
     path('refresh/', views.refresh_view, name='token_refresh'),
     path('me/', views.me_view, name='auth-me'),
     path('profile/', views.user_profile_view, name='user-profile'),
+    path('profile-photo/', views.upload_profile_photo_view, name='upload-profile-photo'),
 ]

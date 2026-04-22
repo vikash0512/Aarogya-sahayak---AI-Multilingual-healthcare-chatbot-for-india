@@ -1,5 +1,10 @@
 import os
+import time
 import logging
+import mimetypes
+import urllib.error
+import urllib.parse
+import urllib.request
 from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny, IsAuthenticated
@@ -13,6 +18,37 @@ from .models import UserProfile
 from audit.utils import log_action
 
 logger = logging.getLogger(__name__)
+ADMIN_EMAILS = {'admin@arogyasahayak.in'}
+
+
+def _get_supabase_admin_client():
+    try:
+        from supabase import create_client
+    except ImportError:
+        return None
+
+    if not settings.SUPABASE_URL or not settings.SUPABASE_SERVICE_KEY:
+        return None
+
+    try:
+        return create_client(settings.SUPABASE_URL, settings.SUPABASE_SERVICE_KEY)
+    except Exception as exc:
+        logger.error(f"Failed to create Supabase admin client: {exc}")
+        return None
+
+
+def _resolve_user_role(user):
+    """Resolve effective role with staff/superuser fallback and sync profile role."""
+    profile, _ = UserProfile.objects.get_or_create(user=user, defaults={'role': 'patient'})
+    effective_role = profile.role
+
+    if user.is_staff or user.is_superuser or (user.email or '').lower() in ADMIN_EMAILS:
+        effective_role = 'admin'
+        if profile.role != 'admin':
+            profile.role = 'admin'
+            profile.save(update_fields=['role'])
+
+    return profile, effective_role
 
 
 def _get_supabase_client():
@@ -276,12 +312,12 @@ def refresh_view(request):
 def me_view(request):
     """Get current user's profile. Used by frontend to check auth state and role."""
     user = request.user
-    profile, _ = UserProfile.objects.get_or_create(user=user, defaults={'role': 'patient'})
+    profile, role = _resolve_user_role(user)
     return Response({
         'id': user.id,
         'name': user.get_full_name() or user.username,
         'email': user.email,
-        'role': profile.role,
+        'role': role,
         'status': profile.status,
         'language_preference': profile.language_preference,
     })
@@ -291,33 +327,94 @@ def me_view(request):
 @permission_classes([IsAuthenticated])
 def users_list_view(request):
     """List all users (admin only)."""
-    # Check admin role
-    profile = getattr(request.user, 'profile', None)
-    if not profile or profile.role != 'admin':
+    _, req_role = _resolve_user_role(request.user)
+    if req_role != 'admin':
         return Response({'error': 'Admin access required'}, status=status.HTTP_403_FORBIDDEN)
 
-    users = User.objects.select_related('profile').all().order_by('-last_login')
-    result = []
-    for user in users:
-        profile = getattr(user, 'profile', None)
-        result.append({
+    result_by_email = {}
+
+    def _store_user(user, profile=None):
+        profile = profile or getattr(user, 'profile', None)
+        email = (user.email or '').strip().lower()
+        if not email:
+            return
+        result_by_email[email] = {
             'id': user.id,
             'name': user.get_full_name() or user.username,
             'email': user.email,
             'role': profile.role if profile else 'patient',
             'status': profile.status if profile else 'active',
             'lastLogin': user.last_login.isoformat() if user.last_login else 'Never',
-        })
-    return Response(result)
+        }
+
+    supabase_client = _get_supabase_admin_client()
+
+    if supabase_client:
+        try:
+            auth_users = []
+            page = 1
+            while True:
+                users_page = supabase_client.auth.admin.list_users(page=page, per_page=100)
+                if not users_page:
+                    break
+                auth_users.extend(users_page)
+                if len(users_page) < 100:
+                    break
+                page += 1
+
+            seen_emails = set()
+            for auth_user in auth_users:
+                email = (getattr(auth_user, 'email', '') or '').strip().lower()
+                if not email or email in seen_emails:
+                    continue
+                seen_emails.add(email)
+
+                user = User.objects.filter(email__iexact=email).select_related('profile').first()
+                if not user:
+                    metadata = getattr(auth_user, 'user_metadata', None) or {}
+                    full_name = metadata.get('full_name', '') or metadata.get('name', '') or ''
+                    username = email.split('@')[0]
+                    base_username = username
+                    counter = 1
+                    while User.objects.filter(username=username).exists():
+                        username = f"{base_username}{counter}"
+                        counter += 1
+
+                    user = User.objects.create(
+                        username=username,
+                        email=email,
+                        first_name=full_name.split(' ')[0] if full_name else '',
+                        last_name=' '.join(full_name.split(' ')[1:]) if full_name else '',
+                    )
+                    user.set_unusable_password()
+                    user.save()
+
+                profile, _ = UserProfile.objects.get_or_create(user=user, defaults={'role': 'patient'})
+                if not profile.supabase_uid:
+                    profile.supabase_uid = getattr(auth_user, 'id', '') or profile.supabase_uid
+                    profile.save(update_fields=['supabase_uid'])
+
+                _store_user(user, profile)
+
+            # Supabase is the source of truth for admin user listing.
+            return Response(sorted(result_by_email.values(), key=lambda item: item['lastLogin'], reverse=True))
+
+        except Exception as exc:
+            logger.error(f"Supabase user sync failed: {exc}")
+
+    # Fallback: if Supabase is unavailable, use local users so panel remains usable.
+    for user in User.objects.select_related('profile').all().order_by('-last_login'):
+        _store_user(user, getattr(user, 'profile', None))
+
+    return Response(sorted(result_by_email.values(), key=lambda item: item['lastLogin'], reverse=True))
 
 
 @api_view(['PATCH'])
 @permission_classes([IsAuthenticated])
 def user_update_view(request, user_id):
     """Update a user's role or status (admin only)."""
-    # Check admin role
-    req_profile = getattr(request.user, 'profile', None)
-    if not req_profile or req_profile.role != 'admin':
+    _, req_role = _resolve_user_role(request.user)
+    if req_role != 'admin':
         return Response({'error': 'Admin access required'}, status=status.HTTP_403_FORBIDDEN)
 
     try:
@@ -383,3 +480,89 @@ def user_profile_view(request):
             'message': 'Profile updated successfully',
             'extra_data': profile.extra_data
         })
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def upload_profile_photo_view(request):
+    """Upload profile photo via backend using Supabase service key (avoids frontend RLS failures)."""
+    uploaded = request.FILES.get('file')
+    if not uploaded:
+        return Response({'error': 'file is required'}, status=status.HTTP_400_BAD_REQUEST)
+
+    content_type = (uploaded.content_type or '').lower()
+    if not content_type.startswith('image/'):
+        return Response({'error': 'Only image uploads are allowed'}, status=status.HTTP_400_BAD_REQUEST)
+
+    max_size = 5 * 1024 * 1024
+    if uploaded.size > max_size:
+        return Response({'error': 'Image must be <= 5MB'}, status=status.HTTP_400_BAD_REQUEST)
+
+    if not settings.SUPABASE_URL or not settings.SUPABASE_SERVICE_KEY:
+        return Response({'error': 'Supabase storage is not configured on server'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+    configured_bucket = (getattr(settings, 'SUPABASE_PROFILE_BUCKET', '') or '').strip()
+    bucket_candidates = [
+        configured_bucket,
+        'profile-photo',
+        'profile-photos',
+        'profile_photo',
+        'profile_photos',
+        'profile photo',
+        'profile photos',
+        'profile',
+        'avatar',
+        'avatars',
+    ]
+    # Keep order stable while removing blanks/duplicates.
+    seen = set()
+    bucket_candidates = [b for b in bucket_candidates if b and not (b in seen or seen.add(b))]
+    extension = os.path.splitext(uploaded.name)[1].lower()
+    if not extension:
+        extension = mimetypes.guess_extension(content_type) or '.jpg'
+
+    object_path = f"{request.user.id}/{request.user.id}_{int(time.time())}{extension}"
+    encoded_object_path = urllib.parse.quote(object_path, safe='/')
+    payload = uploaded.read()
+    last_error = None
+
+    for bucket in bucket_candidates:
+        encoded_bucket = urllib.parse.quote(bucket, safe='')
+        upload_url = f"{settings.SUPABASE_URL}/storage/v1/object/{encoded_bucket}/{encoded_object_path}"
+        req = urllib.request.Request(
+            upload_url,
+            data=payload,
+            method='POST',
+            headers={
+                'apikey': settings.SUPABASE_SERVICE_KEY,
+                'Authorization': f"Bearer {settings.SUPABASE_SERVICE_KEY}",
+                'Content-Type': content_type or 'application/octet-stream',
+                'x-upsert': 'true',
+            },
+        )
+        try:
+            with urllib.request.urlopen(req, timeout=30):
+                public_url = f"{settings.SUPABASE_URL}/storage/v1/object/public/{encoded_bucket}/{encoded_object_path}"
+                return Response({'public_url': public_url, 'bucket': bucket, 'path': object_path})
+        except urllib.error.HTTPError as exc:
+            body = exc.read().decode('utf-8', errors='ignore') if hasattr(exc, 'read') else ''
+            last_error = body or str(exc.reason)
+            msg = (body or str(exc.reason) or '').lower()
+            if 'bucket' in msg and ('not found' in msg or 'not exist' in msg):
+                continue
+            logger.error(f"Profile photo upload failed with status {exc.code}: {body}")
+            return Response({'error': f'Upload failed: {body or exc.reason}'}, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as exc:
+            logger.error(f"Profile photo upload failed: {exc}")
+            return Response({'error': 'Profile photo upload failed'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+    return Response(
+        {
+            'error': (
+                f"Profile photo bucket not found. Tried: {', '.join(bucket_candidates)}. "
+                f"Set SUPABASE_PROFILE_BUCKET in backend .env to the exact bucket ID."
+                + (f" Last error: {last_error}" if last_error else '')
+            )
+        },
+        status=status.HTTP_400_BAD_REQUEST,
+    )

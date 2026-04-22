@@ -126,38 +126,36 @@ def process_document(document_id: int):
 
         logger.info(f"[{doc.name}] Created {len(chunks)} chunks.")
 
-        # Step 3: Generate embeddings
+        # Step 3: Generate embeddings in batches to keep large datasets memory-friendly.
         logger.info(f"[{doc.name}] Step 3/4: Generating embeddings for {len(chunks)} chunks...")
         model = get_embedding_model()
 
-        # Embed in smaller batches to avoid memory issues
-        all_embeddings = []
         batch_size = 32
+        from .vector_store import VectorStoreFactory
+        store = VectorStoreFactory.get_store()
+
+        # Clear old chunks once before we stream new batches in.
+        store.delete_for_document(doc.id)
+        DocumentChunk.objects.filter(document=doc).delete()
+
+        processed_chunks = 0
         for i in range(0, len(chunks), batch_size):
             batch = chunks[i:i + batch_size]
             batch_embeddings = model.encode(batch).tolist()
-            all_embeddings.extend(batch_embeddings)
             logger.info(f"[{doc.name}] Embedded batch {i // batch_size + 1}/{(len(chunks) - 1) // batch_size + 1}")
+            if hasattr(store, 'connection'):
+                store.add_chunks_batch(doc, batch, batch_embeddings, user_id=doc.user_id, start_index=i)
+            else:
+                store.add_chunks_batch(doc, batch, batch_embeddings, start_index=i)
+            processed_chunks += len(batch)
 
-        logger.info(f"[{doc.name}] All embeddings generated.")
+        logger.info(f"[{doc.name}] All embeddings generated and stored.")
 
-        # Step 4: Store in Vector DB
-        logger.info(f"[{doc.name}] Step 4/4: Storing in Vector DB...")
-        from .vector_store import VectorStoreFactory
-        store = VectorStoreFactory.get_store()
-        
-        # Clear old chunks
-        store.delete_for_document(doc.id)
-        DocumentChunk.objects.filter(document=doc).delete()
-        
-        # Add new chunks
-        if hasattr(store, 'connection'):
-            store.add_chunks(doc, chunks, all_embeddings, user_id=doc.user_id)
-        else:
-            store.add_chunks(doc, chunks, all_embeddings)
+        # Step 4: Finalize document status.
+        logger.info(f"[{doc.name}] Step 4/4: Finalizing document status...")
 
         # Update document status
-        doc.chunk_count = len(chunks)
+        doc.chunk_count = processed_chunks
         doc.status = 'indexed'
         doc.error_message = ''
         doc.save()
@@ -172,3 +170,30 @@ def process_document(document_id: int):
         logger.error(f"❌ Document processing failed for '{doc.name}': {e}")
         logger.error(traceback.format_exc())
         return False
+
+
+def enqueue_document_processing(document_id: int):
+    """Create or reuse a durable processing job for the document."""
+    from .models import Document, DocumentIngestionJob
+
+    doc = Document.objects.get(id=document_id)
+    job, _ = DocumentIngestionJob.objects.get_or_create(document=doc)
+    if job.status in {'queued', 'processing'}:
+        doc.status = 'queued'
+        doc.error_message = ''
+        doc.save(update_fields=['status', 'error_message'])
+        return job
+
+    previous_status = job.status
+    job.status = 'queued'
+    job.error_message = ''
+    job.started_at = None
+    job.finished_at = None
+    if previous_status == 'failed':
+        job.attempts = 0
+    job.save()
+
+    doc.status = 'queued'
+    doc.error_message = ''
+    doc.save(update_fields=['status', 'error_message'])
+    return job

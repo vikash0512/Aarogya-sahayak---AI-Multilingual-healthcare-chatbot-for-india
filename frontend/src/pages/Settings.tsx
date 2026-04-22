@@ -6,8 +6,9 @@ import {
   CheckCircle2, FileText, Upload, File, Eye, Trash2,
   Sliders, TrendingDown, Lock, ShieldCheck, Menu, Loader2
 } from 'lucide-react';
-import { getUserProfile, updateUserProfile, getUserDocuments, uploadUserDocument, deleteUserDocument } from '../api';
+import { getUserProfile, updateUserProfile, getUserDocuments, uploadUserDocument, deleteUserDocument, uploadProfilePhoto } from '../api';
 import { useAuth } from '../contexts/AuthContext';
+import { getProfilePhotoUrlFromExtra } from '../utils/profilePhoto';
 
 export default function Settings() {
   const { toggleSidebar } = useOutletContext<LayoutContextType>();
@@ -23,6 +24,8 @@ export default function Settings() {
   const [age, setAge] = useState('');
   const [gender, setGender] = useState('Female');
   const [language, setLanguage] = useState('EN');
+  const [profilePhotoUrl, setProfilePhotoUrl] = useState('');
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
   
   // BMI State
   const [height, setHeight] = useState<number>(165);
@@ -31,6 +34,7 @@ export default function Settings() {
   
   // Upload State
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const photoInputRef = useRef<HTMLInputElement>(null);
   const [documents, setDocuments] = useState<any[]>([]);
 
   useEffect(() => {
@@ -60,6 +64,7 @@ export default function Settings() {
       setGender(extra.gender || 'Female');
       setHeight(extra.height || 165);
       setWeight(extra.weight || 62);
+      setProfilePhotoUrl(getProfilePhotoUrlFromExtra(extra));
       
     } catch (err) {
       console.error("Failed to load profile", err);
@@ -117,6 +122,41 @@ export default function Settings() {
 
   const triggerUpload = () => {
     fileInputRef.current?.click();
+  };
+
+  const triggerPhotoUpload = () => {
+    photoInputRef.current?.click();
+  };
+
+  const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files || e.target.files.length === 0 || !user?.id) return;
+
+    const file = e.target.files[0];
+    if (!file.type.startsWith('image/')) {
+      alert('Please upload an image file (JPG, PNG, WEBP).');
+      return;
+    }
+
+    try {
+      setUploadingPhoto(true);
+      const response = await uploadProfilePhoto(file);
+      const publicUrl = response?.public_url;
+      if (!publicUrl) {
+        throw new Error('Upload succeeded but no image URL was returned');
+      }
+      await updateUserProfile({
+        extra_data: {
+          profile_photo_url: publicUrl,
+        },
+      });
+      setProfilePhotoUrl(publicUrl);
+    } catch (err: any) {
+      console.error('Profile photo upload failed', err);
+      alert(err?.message || 'Failed to upload profile photo');
+    } finally {
+      setUploadingPhoto(false);
+      if (photoInputRef.current) photoInputRef.current.value = '';
+    }
   };
 
   const handleUpdateWeight = () => {
@@ -207,11 +247,31 @@ export default function Settings() {
                 <div className="p-6">
                   <div className="flex flex-col md:flex-row gap-8 items-start">
                     <div className="flex flex-col items-center gap-4 min-w-[120px]">
-                      <div className="relative group cursor-pointer">
+                      <input
+                        type="file"
+                        ref={photoInputRef}
+                        className="hidden"
+                        accept="image/*"
+                        onChange={handlePhotoUpload}
+                      />
+                      <div className="relative group cursor-pointer" onClick={triggerPhotoUpload}>
                         <div className="h-32 w-32 rounded-full bg-primary/20 text-primary flex items-center justify-center font-bold text-4xl overflow-hidden ring-4 ring-slate-50 dark:ring-slate-700">
-                          {name.charAt(0) || email.charAt(0) || 'U'}
+                          {profilePhotoUrl ? (
+                            <img
+                              src={profilePhotoUrl}
+                              alt="Profile"
+                              className="w-full h-full object-cover"
+                              loading="lazy"
+                            />
+                          ) : (
+                            <>{name.charAt(0) || email.charAt(0) || 'U'}</>
+                          )}
+                        </div>
+                        <div className="absolute bottom-1 right-1 bg-primary text-white rounded-full p-2 shadow-md">
+                          {uploadingPhoto ? <Loader2 className="w-4 h-4 animate-spin" /> : <Camera className="w-4 h-4" />}
                         </div>
                       </div>
+                      <p className="text-xs text-slate-500 dark:text-slate-400">Tap image to update photo</p>
                     </div>
                     
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6 w-full">

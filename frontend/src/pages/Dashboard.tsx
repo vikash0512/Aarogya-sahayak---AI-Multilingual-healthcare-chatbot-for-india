@@ -11,11 +11,22 @@ export default function Dashboard() {
   const { toggleSidebar } = useOutletContext<LayoutContextType>();
   const { user } = useAuth();
 
+  const healthQuotes = [
+    'Small daily habits create lifelong health.',
+    'Hydrate, move, breathe - your body notices everything.',
+    'Prevention today is stronger than treatment tomorrow.',
+    'Consistent sleep is one of your best medicines.',
+    'A short walk after meals can do wonders for your heart.',
+  ];
+
   // Helper to format name cleanly
   const userName = user?.user_metadata?.full_name 
     ? user.user_metadata.full_name.split(' ')[0] 
     : user?.email?.split('@')[0] 
     || 'User';
+
+  const quoteIndex = ((new Date().getDate() + userName.length) % healthQuotes.length + healthQuotes.length) % healthQuotes.length;
+  const todayQuote = healthQuotes[quoteIndex];
 
   return (
     <>
@@ -44,6 +55,7 @@ export default function Dashboard() {
               <div>
                 <h2 className="text-2xl md:text-3xl font-bold text-slate-900 dark:text-white tracking-tight capitalize">Welcome Back, {userName}</h2>
                 <p className="text-slate-500 dark:text-slate-400 mt-1">Here is your daily health summary.</p>
+                <p className="text-sm text-primary dark:text-blue-400 mt-1 font-medium">{todayQuote}</p>
               </div>
               <div className="flex items-center gap-2 bg-white dark:bg-slate-800 px-4 py-2 rounded-full shadow-sm border border-blue-100 dark:border-slate-700 w-fit">
                 <span className="relative flex h-2.5 w-2.5">

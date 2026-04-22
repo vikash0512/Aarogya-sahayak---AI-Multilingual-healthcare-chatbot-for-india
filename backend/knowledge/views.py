@@ -1,12 +1,11 @@
 import os
-import threading
 from rest_framework.decorators import api_view, permission_classes, parser_classes
 from rest_framework.permissions import AllowAny
 from rest_framework.parsers import MultiPartParser, FormParser
 from rest_framework.response import Response
 from rest_framework import status
-from .models import Document, DocumentChunk
-from .processor import process_document
+from .models import Document, DocumentChunk, DocumentIngestionJob
+from .processor import enqueue_document_processing
 from audit.utils import log_action
 
 
@@ -37,8 +36,10 @@ def upload_document(request):
         chunk_size=chunk_size,
         source_language=source_language,
         source_authority=source_authority,
-        status='uploaded',
+        status='queued',
     )
+
+    job = enqueue_document_processing(doc.id)
 
     log_action(
         user=request.user if request.user.is_authenticated else None,
@@ -50,9 +51,10 @@ def upload_document(request):
 
     return Response({
         'id': doc.id,
+        'job_id': job.id,
         'name': doc.name,
         'status': doc.status,
-        'message': 'File uploaded successfully. Call process endpoint to start indexing.'
+        'message': 'File uploaded successfully. Processing has been queued.'
     }, status=status.HTTP_201_CREATED)
 
 
@@ -65,22 +67,11 @@ def process_document_view(request, doc_id):
     except Document.DoesNotExist:
         return Response({'error': 'Document not found'}, status=status.HTTP_404_NOT_FOUND)
 
-    if doc.status == 'processing':
-        return Response({'message': 'Document is already being processed'})
-
-    # Process in background thread
-    def run_processing():
-        process_document(doc.id)
-
-    thread = threading.Thread(target=run_processing)
-    thread.start()
-
-    doc.status = 'processing'
-    doc.save()
+    job = enqueue_document_processing(doc.id)
 
     log_action(
         user=request.user if request.user.is_authenticated else None,
-        action='Started Document Processing',
+        action='Queued Document Processing',
         resource=doc.name,
         ip=request.META.get('REMOTE_ADDR', ''),
         status_val='Success'
@@ -88,8 +79,9 @@ def process_document_view(request, doc_id):
 
     return Response({
         'id': doc.id,
-        'status': 'processing',
-        'message': 'Document processing started in background.'
+        'job_id': job.id,
+        'status': doc.status,
+        'message': 'Document processing has been queued.'
     })
 
 
@@ -105,8 +97,10 @@ def list_documents(request):
             'name': doc.name,
             'type': doc.file_type,
             'chunks': doc.chunk_count,
-            'status': 'Indexed' if doc.status == 'indexed' else 'Processing' if doc.status == 'processing' else 'Failed' if doc.status == 'failed' else 'Uploaded',
+            'status_raw': doc.status,
+            'status': 'Indexed' if doc.status == 'indexed' else 'Processing' if doc.status == 'processing' else 'Queued' if doc.status == 'queued' else 'Failed' if doc.status == 'failed' else 'Uploaded',
             'date': doc.created_at.strftime('%Y-%m-%d'),
+            'created_at': doc.created_at.isoformat(),
             'error': doc.error_message,
         })
     return Response(result)
@@ -159,24 +153,17 @@ def reindex_document(request, doc_id):
     except Document.DoesNotExist:
         return Response({'error': 'Document not found'}, status=status.HTTP_404_NOT_FOUND)
 
-    def run_processing():
-        process_document(doc.id)
-
-    thread = threading.Thread(target=run_processing)
-    thread.start()
-
-    doc.status = 'processing'
-    doc.save()
+    job = enqueue_document_processing(doc.id)
 
     log_action(
         user=request.user if request.user.is_authenticated else None,
-        action='Re-index Document',
+        action='Queued Re-index Document',
         resource=doc.name,
         ip=request.META.get('REMOTE_ADDR', ''),
         status_val='Success'
     )
 
-    return Response({'id': doc.id, 'status': 'processing', 'message': 'Re-indexing started.'})
+    return Response({'id': doc.id, 'job_id': job.id, 'status': doc.status, 'message': 'Re-indexing has been queued.'})
 
 
 @api_view(['GET'])
@@ -194,4 +181,23 @@ def document_status(request, doc_id):
         'status': doc.status,
         'chunks': doc.chunk_count,
         'error': doc.error_message,
+    })
+
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def ingestion_job_status(request, job_id):
+    try:
+        job = DocumentIngestionJob.objects.select_related('document').get(id=job_id)
+    except DocumentIngestionJob.DoesNotExist:
+        return Response({'error': 'Job not found'}, status=status.HTTP_404_NOT_FOUND)
+
+    return Response({
+        'id': job.id,
+        'document_id': job.document_id,
+        'status': job.status,
+        'attempts': job.attempts,
+        'error': job.error_message,
+        'started_at': job.started_at,
+        'finished_at': job.finished_at,
     })

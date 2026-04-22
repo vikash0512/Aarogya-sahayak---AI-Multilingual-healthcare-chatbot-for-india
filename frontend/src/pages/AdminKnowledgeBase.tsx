@@ -19,6 +19,64 @@ export default function AdminKnowledgeBase() {
     } catch (err) {} finally { setLoading(false); }
   };
 
+  const isActiveProcessing = (doc: any) => {
+    const status = (doc.status_raw || '').toLowerCase();
+    return status === 'queued' || status === 'uploaded' || status === 'processing';
+  };
+
+  const getEstimatedTotalSeconds = (doc: any) => {
+    const chunks = Number(doc?.chunks || 0);
+    if (chunks > 0) {
+      return Math.max(45, Math.min(900, Math.round(chunks * 0.7)));
+    }
+    return 120;
+  };
+
+  const getElapsedSeconds = (doc: any) => {
+    if (!doc?.created_at) return 0;
+    const start = new Date(doc.created_at).getTime();
+    if (Number.isNaN(start)) return 0;
+    return Math.max(0, Math.floor((Date.now() - start) / 1000));
+  };
+
+  const formatSeconds = (value: number) => {
+    const total = Math.max(0, Math.floor(value));
+    const mins = Math.floor(total / 60);
+    const secs = total % 60;
+    return mins > 0 ? `${mins}m ${secs}s` : `${secs}s`;
+  };
+
+  const getProcessingProgress = (doc: any) => {
+    const status = (doc.status_raw || '').toLowerCase();
+    const elapsed = getElapsedSeconds(doc);
+    const estimate = getEstimatedTotalSeconds(doc);
+
+    if (status === 'indexed') return 100;
+    if (status === 'failed') return 0;
+    if (status === 'queued' || status === 'uploaded') {
+      return Math.min(35, Math.round(10 + (elapsed / estimate) * 25));
+    }
+    if (status === 'processing') {
+      return Math.min(95, Math.round(35 + (elapsed / estimate) * 60));
+    }
+    return 0;
+  };
+
+  useEffect(() => {
+    const hasActive = docs.some(isActiveProcessing);
+    if (!hasActive) {
+      return;
+    }
+
+    const timer = window.setInterval(() => {
+      loadDocs();
+    }, 3000);
+
+    return () => {
+      window.clearInterval(timer);
+    };
+  }, [docs]);
+
   const handleDelete = async (id: number, name: string) => {
     if (!confirm(`Delete "${name}"? This will also remove its vectors.`)) return;
     try {
@@ -97,6 +155,22 @@ export default function AdminKnowledgeBase() {
                             {doc.status === 'Failed' && <AlertCircle className="w-3 h-3" />}
                             {doc.status}
                           </span>
+                          {isActiveProcessing(doc) && (
+                            <div className="mt-2 w-52">
+                              <div className="flex items-center justify-between text-[10px] text-slate-500 dark:text-slate-400 mb-1">
+                                <span>{getProcessingProgress(doc)}%</span>
+                                <span>
+                                  ETA {formatSeconds(Math.max(0, getEstimatedTotalSeconds(doc) - getElapsedSeconds(doc)))}
+                                </span>
+                              </div>
+                              <div className="h-1.5 w-full bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
+                                <div
+                                  className="h-full bg-primary rounded-full transition-all duration-700 ease-out"
+                                  style={{ width: `${Math.max(5, getProcessingProgress(doc))}%` }}
+                                ></div>
+                              </div>
+                            </div>
+                          )}
                         </td>
                         <td className="px-6 py-4 text-sm text-slate-500">{doc.date}</td>
                         <td className="px-6 py-4 text-right">

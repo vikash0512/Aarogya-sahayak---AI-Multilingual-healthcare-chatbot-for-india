@@ -26,6 +26,10 @@ async function ensureAuthListener() {
 export async function apiFetch(path: string, options: RequestInit = {}): Promise<any> {
   await ensureAuthListener();
 
+  // Prefer the latest in-memory session token to avoid stale token loops after login/refresh.
+  const { data: { session } } = await supabase.auth.getSession();
+  const accessToken = session?.access_token ?? cachedAccessToken;
+
   const headers: Record<string, string> = {
     ...(options.headers as Record<string, string> || {}),
   };
@@ -35,14 +39,36 @@ export async function apiFetch(path: string, options: RequestInit = {}): Promise
     headers['Content-Type'] = 'application/json';
   }
 
-  if (cachedAccessToken) {
-    headers['Authorization'] = `Bearer ${cachedAccessToken}`;
+  if (accessToken) {
+    headers['Authorization'] = `Bearer ${accessToken}`;
   }
 
-  const response = await fetch(`${API_BASE}${path}`, {
+  let response = await fetch(`${API_BASE}${path}`, {
     ...options,
     headers,
   });
+
+  // One retry with a freshly read token before forcing sign-out.
+  if (response.status === 401) {
+    const { data: { session: refreshedSession } } = await supabase.auth.getSession();
+    const refreshedToken = refreshedSession?.access_token ?? null;
+
+    if (refreshedToken && refreshedToken !== accessToken) {
+      const retryHeaders: Record<string, string> = {
+        ...(options.headers as Record<string, string> || {}),
+      };
+
+      if (!(options.body instanceof FormData)) {
+        retryHeaders['Content-Type'] = 'application/json';
+      }
+      retryHeaders['Authorization'] = `Bearer ${refreshedToken}`;
+
+      response = await fetch(`${API_BASE}${path}`, {
+        ...options,
+        headers: retryHeaders,
+      });
+    }
+  }
 
   if (response.status === 401) {
     await supabase.auth.signOut();
@@ -215,6 +241,15 @@ export async function updateUserProfile(data: any) {
   return apiFetch('/auth/profile/', {
     method: 'PATCH',
     body: JSON.stringify(data),
+  });
+}
+
+export async function uploadProfilePhoto(file: File) {
+  const formData = new FormData();
+  formData.append('file', file);
+  return apiFetch('/auth/profile-photo/', {
+    method: 'POST',
+    body: formData,
   });
 }
 

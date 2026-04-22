@@ -15,14 +15,16 @@ export default function AdminUserManagement() {
   const loadUsers = async () => {
     try {
       const data = await getUsers();
-      setUsers(data);
+      setUsers(Array.isArray(data) ? data : []);
     } catch (err) {} finally { setLoading(false); }
   };
 
-  const filtered = users.filter(u => 
-    u.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-    u.email.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filtered = users.filter(u => {
+    const query = searchTerm.toLowerCase();
+    const name = (u.name || u.email || '').toLowerCase();
+    const email = (u.email || '').toLowerCase();
+    return name.includes(query) || email.includes(query);
+  });
 
   const getRoleBadge = (role: string) => {
     const styles: Record<string, string> = {
@@ -54,6 +56,12 @@ export default function AdminUserManagement() {
           <div className="bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-slate-200 dark:border-slate-800 overflow-hidden">
             {loading ? (
               <div className="p-8 flex justify-center"><Loader2 className="w-6 h-6 animate-spin text-primary" /></div>
+            ) : filtered.length === 0 ? (
+              <div className="p-10 text-center">
+                <Users className="w-10 h-10 mx-auto text-slate-300 dark:text-slate-600 mb-3" />
+                <p className="text-sm font-medium text-slate-800 dark:text-slate-200">No users found yet.</p>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">If you just removed a Supabase user, refresh after the backend sync finishes.</p>
+              </div>
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full text-left border-collapse">
@@ -93,7 +101,7 @@ export default function AdminUserManagement() {
                             {user.status.charAt(0).toUpperCase() + user.status.slice(1)}
                           </span>
                         </td>
-                        <td className="px-6 py-4 text-sm text-slate-500">{user.lastLogin}</td>
+                        <td className="px-6 py-4 text-sm text-slate-500">{user.lastLogin || 'Never'}</td>
                       </tr>
                     ))}
                   </tbody>
